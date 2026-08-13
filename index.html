@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FSI Daily — Financial Services Intelligence</title>
+  <meta name="description" content="What matters in banking, payments, fintech, insurance, regulation and AI + finance.">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="header">
+  <div class="container nav">
+    <a class="logo" href="/">FSI<span>DAILY</span></a>
+    <nav>
+      <a href="#latest">Latest</a>
+      <a href="#banking">Banking</a>
+      <a href="#payments">Payments</a>
+      <a href="#fintech">Fintech</a>
+      <a href="#regulation">Regulation</a>
+      <a href="#ai">AI + Finance</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero container">
+    <div>
+      <div class="kicker">FINANCIAL SERVICES INTELLIGENCE</div>
+      <h1>What matters in financial services.</h1>
+      <p>Curated intelligence across banking, payments, fintech, insurance, regulation and AI + finance.</p>
+      <div class="actions">
+        <a class="button" href="#latest">Explore latest</a>
+        <a href="/feed.xml">RSS feed →</a>
+      </div>
+    </div>
+    <div class="hero-note">
+      <span>FSI DAILY</span>
+      <strong>Independent.<br>Focused.<br>Useful.</strong>
+      <p>Phase 1 starts with trusted RSS sources and links readers to the original publisher.</p>
+    </div>
+  </section>
+
+  <section class="topics">
+    <div class="container topic-row">
+      <span>FOCUS</span>
+      <a href="#banking">Banking</a>
+      <a href="#payments">Payments</a>
+      <a href="#fintech">Fintech</a>
+      <a href="#regulation">Regulation</a>
+      <a href="#ai">AI + Finance</a>
+      <a href="#latest">Insurance</a>
+    </div>
+  </section>
+
+  <section id="latest" class="container section">
+    <div class="section-title">
+      <div>
+        <div class="kicker">LATEST</div>
+        <h2>Financial services intelligence</h2>
+      </div>
+      <button id="refresh">Refresh</button>
+    </div>
+    <div id="status">Loading stories…</div>
+    <div id="stories" class="grid"></div>
+  </section>
+
+  <section class="container statement">
+    <div class="kicker">EDITORIAL PRINCIPLE</div>
+    <h2>News is the input.<br>Context is the product.</h2>
+    <p>Phase 1 focuses on reliable aggregation. Later phases can add categorisation, AI-assisted summaries, “Why it matters”, original analysis and a premium executive brief.</p>
+  </section>
+
+  <section id="banking" class="container category">
+    <div class="kicker">BANKING</div>
+    <h2>Banking signals</h2>
+    <div id="banking-grid" class="grid"></div>
+  </section>
+
+  <section id="payments" class="container category">
+    <div class="kicker">PAYMENTS</div>
+    <h2>Payments & infrastructure</h2>
+    <div id="payments-grid" class="grid"></div>
+  </section>
+
+  <section id="fintech" class="container category">
+    <div class="kicker">FINTECH</div>
+    <h2>Fintech & innovation</h2>
+    <div id="fintech-grid" class="grid"></div>
+  </section>
+
+  <section id="regulation" class="container category">
+    <div class="kicker">REGULATION</div>
+    <h2>Regulation & policy</h2>
+    <div id="regulation-grid" class="grid"></div>
+  </section>
+
+  <section id="ai" class="container category last">
+    <div class="kicker">AI + FINANCE</div>
+    <h2>AI in financial services</h2>
+    <div id="ai-grid" class="grid"></div>
+  </section>
+</main>
+
+<footer>
+  <div class="container footer-row">
+    <span>FSI Daily</span>
+    <span>What matters in financial services.</span>
+  </div>
+</footer>
+
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+}[c]));
+
+function card(item) {
+  const date = item.date ? new Date(item.date).toLocaleDateString(undefined, {day:"numeric", month:"short", year:"numeric"}) : "";
+  return `<article class="card">
+    <div class="meta"><span>${esc(item.source)}</span><span>${esc(date)}</span></div>
+    <h3>${esc(item.title)}</h3>
+    ${item.description ? `<p>${esc(item.description)}</p>` : ""}
+    <a href="${esc(item.link)}" target="_blank" rel="noopener noreferrer">Read original →</a>
+  </article>`;
+}
+
+async function load() {
+  const status = document.getElementById("status");
+  status.textContent = "Loading stories…";
+  try {
+    const response = await fetch("/.netlify/functions/feed", {cache:"no-store"});
+    if (!response.ok) throw new Error("Feed unavailable");
+    const data = await response.json();
+    const items = data.items || [];
+    document.getElementById("stories").innerHTML = items.map(card).join("");
+    const groups = {
+      banking: /bank|rbi|credit|lending|loan/i,
+      payments: /payment|upi|card|fintech infrastructure/i,
+      fintech: /fintech|startup|digital finance/i,
+      regulation: /regulat|sebi|rbi|policy|circular|compliance/i,
+      ai: /artificial intelligence|\bai\b|machine learning|generative/i
+    };
+    Object.entries(groups).forEach(([key, re]) => {
+      document.getElementById(key + "-grid").innerHTML =
+        items.filter(x => re.test((x.title || "") + " " + (x.description || "") + " " + (x.source || ""))).slice(0,6).map(card).join("");
+    });
+    status.textContent = `${items.length} stories loaded`;
+  } catch(e) {
+    status.textContent = "RSS service is not active yet. Deploy the Netlify Function to load live stories.";
+  }
+}
+document.getElementById("refresh").addEventListener("click", load);
+load();
+</script>
+</body>
+</html>

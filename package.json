@@ -1,0 +1,9 @@
+{
+  "name": "fsi-daily",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Financial Services Intelligence RSS-first publication",
+  "dependencies": {
+    "rss-parser": "^3.13.0"
+  }
+}
