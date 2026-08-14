@@ -1,42 +1,14 @@
 const Parser = require("rss-parser");
 const parser = new Parser({ timeout: 12000 });
-
-const FEEDS = [
-  { name: "RBI", url: "https://www.rbi.org.in/Scripts/rss.aspx" },
-  { name: "Finextra", url: "https://www.finextra.com/rss/headlines.aspx" },
-  { name: "Finextra · Payments", url: "https://www.finextra.com/rss/channel.aspx?channel=payments" },
-  { name: "Finextra · AI", url: "https://www.finextra.com/rss/channel.aspx?channel=ai" },
-  { name: "Finextra · Retail Banking", url: "https://www.finextra.com/rss/channel.aspx?channel=retail" },
-  { name: "Finextra · Regulation", url: "https://www.finextra.com/rss/channel.aspx?channel=risk" }
-];
+const {
+  FEEDS,
+  cleanTitle,
+  repetitiveNoticeKey,
+  parseDate
+} = require("./feed");
 
 const LIMIT_PER_SOURCE = 6;
 const TOTAL_LIMIT = 30;
-
-const key = t => String(t || "").toLowerCase()
-  .replace(/\[[^\]]*\]/g, "")
-  .replace(/\b(completion of|recovery certificate|no\.?|order|circular|press release|dated|certificate|appeal|reference|ref\.?)\b/g, "")
-  .replace(/\b\d{2,}\b/g, "")
-  .replace(/[^a-z0-9]+/g, " ")
-  .trim();
-
-const repetitiveNoticeKey = title => {
-  const normalized = key(title);
-  const raw = String(title || "").toLowerCase();
-  if (!normalized) return "";
-  if (/completion of recovery/.test(raw)) return "recovery-certificate-notice";
-  if (/\b(recovery certificate|auction notice|compliance certificate|certificate issued)\b/.test(raw)) {
-    return normalized.split(" ").slice(0, 4).join(" ");
-  }
-  return "";
-};
-
-const safeDate = item => {
-  const raw = item.isoDate || item.pubDate || item.published || item.date;
-  if (!raw) return null;
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-};
 
 exports.handler = async () => {
   const results = await Promise.allSettled(
@@ -45,7 +17,7 @@ exports.handler = async () => {
       return (feed.items || []).slice(0, 20).map(i => ({
         title: i.title || "Untitled",
         link: i.link || i.guid || "#",
-        date: safeDate(i),
+        date: parseDate(i),
         source: source.name
       }));
     })
@@ -68,7 +40,7 @@ exports.handler = async () => {
 
   for (const x of results.flatMap(r => r.status === "fulfilled" ? r.value : [])
     .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))) {
-    const k = key(x.title);
+    const k = cleanTitle(x.title);
     const noticeKey = repetitiveNoticeKey(x.title);
     const count = sourceCounts.get(x.source) || 0;
     if (!k || seen.has(k) || seenLinks.has(x.link) || (noticeKey && seenNotices.has(noticeKey)) || count >= LIMIT_PER_SOURCE) continue;

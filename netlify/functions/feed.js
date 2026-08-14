@@ -2,7 +2,8 @@ const Parser = require("rss-parser");
 const parser = new Parser({ timeout: 12000 });
 
 const FEEDS = [
-  { name: "RBI", url: "https://www.rbi.org.in/Scripts/rss.aspx" },
+  { name: "RBI", url: "https://rbi.org.in/pressreleases_rss.xml" },
+  { name: "RBI", url: "https://rbi.org.in/notifications_rss.xml" },
   { name: "Finextra", url: "https://www.finextra.com/rss/headlines.aspx" },
   { name: "Finextra · Payments", url: "https://www.finextra.com/rss/channel.aspx?channel=payments" },
   { name: "Finextra · AI", url: "https://www.finextra.com/rss/channel.aspx?channel=ai" },
@@ -27,13 +28,31 @@ const CATEGORY_BOOSTS = {
   "AI + Finance": 2
 };
 
+const SOURCE_BOOSTS = {
+  "RBI": 2,
+  "NPCI": 2,
+  "IRDAI": 2
+};
+
+const INDIA_SIGNALS = /\b(india|indian|rbi|reserve bank of india|npci|national payments corporation of india|irdai|rupay|upi|nbfc|mumbai|delhi|bengaluru|hyderabad|chennai|aadhaar|bharat|ifsc|psb|scheduled banks in india)\b/;
+
 const WHY_IT_MATTERS = {
-  "Payments": "Payments infrastructure, customer journeys or transaction economics could be affected.",
-  "AI + Finance": "AI adoption could change financial-services operations, risk controls or customer experience.",
-  "Regulation": "Regulatory or policy changes can affect compliance, product design and market strategy.",
-  "Insurance": "The development could influence insurance distribution, pricing, risk or customer experience.",
-  "Fintech": "The move could reshape competition, financial infrastructure or how customers access financial products.",
-  "Banking": "The development could influence banking strategy, operations, risk or customer economics."
+  India: {
+    "Banking": "Indian banks and financial institutions may need to adjust operations, compliance or product strategy.",
+    "Payments": "The development could affect India's payments infrastructure, transaction economics or digital-payment adoption.",
+    "Fintech": "The move could reshape competition, infrastructure or access to financial products in India's financial system.",
+    "Insurance": "The development could influence insurance distribution, pricing, compliance or policyholder experience in India.",
+    "Regulation": "The change could affect compliance requirements, product design or market strategy for Indian financial institutions.",
+    "AI + Finance": "The development could change how Indian financial institutions deploy AI across operations, risk and customer experience."
+  },
+  Global: {
+    "Banking": "The development could influence banking strategy, competition, risk or customer economics.",
+    "Payments": "The development could affect payments infrastructure, cross-border transactions or fintech competition.",
+    "Fintech": "The move could reshape competition, financial infrastructure or access to financial products.",
+    "Insurance": "The development could influence insurance distribution, pricing, risk or customer experience.",
+    "Regulation": "Regulatory or policy changes can affect compliance, product design and market strategy.",
+    "AI + Finance": "The development could change how financial institutions deploy AI across operations, risk and customer experience."
+  }
 };
 
 function cleanTitle(title = "") {
@@ -62,6 +81,13 @@ function parseDate(item) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+function shortDescription(item) {
+  return (item.contentSnippet || item.content || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 220);
+}
+
 function categoryFor(item, source) {
   const text = `${item.title || ""} ${item.description || ""} ${source}`.toLowerCase();
   if (/insurance|irdai|insurer|policyholder|premium/.test(text)) return "Insurance";
@@ -70,6 +96,19 @@ function categoryFor(item, source) {
   if (/artificial intelligence|\bai\b|machine learning|generative|copilot|automation/.test(text)) return "AI + Finance";
   if (/regulat|sebi|rbi|circular|compliance|order|policy|notification|consultation|risk/.test(text)) return "Regulation";
   return "Banking";
+}
+
+function regionFor(item) {
+  const source = item.source || "";
+  const text = `${item.title || ""} ${item.description || ""} ${source}`.toLowerCase();
+  if (/^(RBI|NPCI|IRDAI)$/.test(source)) return "India";
+  if (INDIA_SIGNALS.test(text)) return "India";
+  return "Global";
+}
+
+function whyItMattersFor(item) {
+  const region = item.region === "India" ? "India" : "Global";
+  return WHY_IT_MATTERS[region][item.category] || WHY_IT_MATTERS[region].Banking;
 }
 
 function impactScoreFor(item) {
@@ -83,7 +122,8 @@ function impactScoreFor(item) {
 
   score += CATEGORY_BOOSTS[item.category] || 0;
 
-  if (item.source === "RBI") score += 2;
+  score += SOURCE_BOOSTS[item.source] || 0;
+  if (item.region === "India" && /\b(india|indian|upi|rupay|rbi|npci|irdai)\b/.test(text)) score += 1;
 
   if (item.date) {
     const ageMs = Date.now() - new Date(item.date).getTime();
@@ -107,6 +147,7 @@ function buildTopStories(items) {
   const remainder = [];
   const usedSources = new Set();
   const usedCategories = new Set();
+  const usedRegions = new Set();
 
   for (const item of items) {
     if (top.length >= TOP_STORIES_LIMIT) {
@@ -114,12 +155,26 @@ function buildTopStories(items) {
       continue;
     }
 
-    if (!usedSources.has(item.source) && !usedCategories.has(item.category)) {
+    const needsRegionDiversity = usedRegions.size < 2 && items.some(candidate => !usedRegions.has(candidate.region));
+    const regionEligible = !needsRegionDiversity || !usedRegions.has(item.region);
+
+    if (!usedSources.has(item.source) && !usedCategories.has(item.category) && regionEligible) {
       top.push(item);
       usedSources.add(item.source);
       usedCategories.add(item.category);
+      usedRegions.add(item.region);
     } else {
       remainder.push(item);
+    }
+  }
+
+  for (const item of remainder) {
+    if (top.length >= TOP_STORIES_LIMIT) break;
+    if (!usedSources.has(item.source) && !usedRegions.has(item.region)) {
+      top.push(item);
+      usedSources.add(item.source);
+      usedCategories.add(item.category);
+      usedRegions.add(item.region);
     }
   }
 
@@ -129,7 +184,13 @@ function buildTopStories(items) {
       top.push(item);
       usedSources.add(item.source);
       usedCategories.add(item.category);
+      usedRegions.add(item.region);
     }
+  }
+
+  for (const item of remainder) {
+    if (top.length >= TOP_STORIES_LIMIT) break;
+    if (!top.includes(item)) top.push(item);
   }
 
   const topIds = new Set(top.map(item => item.link));
@@ -142,17 +203,21 @@ exports.handler = async () => {
   const results = await Promise.allSettled(
     FEEDS.map(async source => {
       const feed = await parser.parseURL(source.url);
-      return (feed.items || []).slice(0, 20).map(item => ({
+      return (feed.items || []).slice(0, 20).map(item => {
+        const description = shortDescription(item);
+        const story = {
         title: item.title || "Untitled",
         link: item.link || item.guid || "#",
         date: parseDate(item),
-        description: (item.contentSnippet || item.content || "").replace(/\s+/g, " ").slice(0, 220),
+        description,
         source: source.name,
-        category: categoryFor(
-          { title: item.title, description: item.contentSnippet || item.content },
-          source.name
-        )
-      }));
+        category: categoryFor({ title: item.title, description }, source.name)
+      };
+        return {
+          ...story,
+          region: regionFor(story)
+        };
+      });
     })
   );
 
@@ -191,7 +256,7 @@ exports.handler = async () => {
     const enriched = {
       ...item,
       impactScore: impactScoreFor(item),
-      whyItMatters: WHY_IT_MATTERS[item.category] || WHY_IT_MATTERS.Banking
+      whyItMatters: whyItMattersFor(item)
     };
 
     seenLinks.add(item.link);
@@ -213,4 +278,12 @@ exports.handler = async () => {
     },
     body: JSON.stringify({ items: ranked })
   };
+};
+
+module.exports = {
+  handler: exports.handler,
+  FEEDS,
+  cleanTitle,
+  repetitiveNoticeKey,
+  parseDate
 };
