@@ -23,6 +23,16 @@ NPCI was investigated but not added because no official public RSS, Atom, or equ
 
 IRDAI was investigated but not added because the official site exposed HTML pages and a sitemap reference, but no verified public RSS or Atom feed endpoint could be confirmed from the official markup or source pages.
 
+## Phase 1.4 — Executive Brief
+
+FSI Daily now includes an Executive Brief that turns the strongest existing feed stories into a compact editorial briefing for financial-services leaders.
+
+- The brief is available at `/.netlify/functions/brief`.
+- It selects up to 5 stories from the normalized feed using deterministic rules based on `impactScore`, freshness, and source/category/region diversity.
+- It generates `What Happened`, `Why It Matters`, `Who Should Care`, and `India Impact` using only RSS metadata already available in the project.
+- It does not use any external AI API.
+- It always keeps the original publisher link as the destination for the full story.
+
 ## Deploy
 
 1. Upload these files to the `manasmahodaya/fsi-daily` GitHub repository.
