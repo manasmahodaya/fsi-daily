@@ -90,46 +90,43 @@ function truncate(text, maxLength) {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
-function whatHappenedFor(item) {
-  const title = truncate(item.title, 140);
-  const description = truncate(item.description, 180);
-  if (description) {
-    return `According to the original publisher, ${title}. ${description}`;
-  }
-  return `According to the original publisher, ${title}.`;
-}
-
-function whyItMattersForBrief(item) {
-  return EXECUTIVE_WHY[item.category] || EXECUTIVE_WHY.Banking;
-}
-
-function audienceFor(item) {
-  const text = `${item.title || ""} ${item.description || ""}`.toLowerCase();
-  if (item.category === "Regulation") {
-    return /\b(risk|fraud|penalty|cyber|outage)\b/.test(text) ? "Risk leaders" : "Compliance leaders";
-  }
-  if (item.category === "Payments") return "Payments leaders";
-  if (item.category === "AI + Finance") return "CIO / CTO";
-  if (item.category === "Insurance") return "Insurance executives";
-  if (item.category === "Fintech") {
-    return /\b(funding|acquisition|merger|capital|invest)\b/.test(text) ? "Financial-services investors" : "Fintech founders";
-  }
-  return "Bank executives";
-}
-
 function indiaImpactFor(item) {
   if (item.region === "India") {
     return INDIA_IMPACT[item.category] || INDIA_IMPACT.Banking;
   }
 
   const text = `${item.title || ""} ${item.description || ""}`.toLowerCase();
+
   if (/\bindia|indian|upi|rupay|rbi|nbfc\b/.test(text)) {
     return "Indian financial institutions should assess whether the development has local competitive, regulatory or operating implications.";
   }
 
-  return null;
-}
+  if (item.category === "Payments") {
+    return "Indian payments and fintech leaders should monitor the development for potential implications for payment infrastructure, competition and customer adoption.";
+  }
 
+  if (item.category === "Fintech") {
+    return "Indian fintech leaders should monitor the development for broader implications for competition, technology adoption and financial-services innovation.";
+  }
+
+  if (item.category === "Banking") {
+    return "Indian banks and financial-services leaders should monitor the development for broader implications for strategy, competition, risk and customer economics.";
+  }
+
+  if (item.category === "Insurance") {
+    return "Indian insurance leaders should monitor the development for broader implications for distribution, technology, regulation and customer experience.";
+  }
+
+  if (item.category === "Regulation") {
+    return "Indian financial-services leaders should monitor the development as part of broader global regulatory, compliance and governance trends.";
+  }
+
+  if (item.category === "AI + Finance") {
+    return "Indian financial institutions should monitor the development for potential implications for AI adoption, operational efficiency, risk management and customer experience.";
+  }
+
+  return "No immediate India-specific impact identified; the development remains relevant as a broader global financial-services trend.";
+}
 exports.handler = async () => {
   try {
     const response = await feed.handler();
