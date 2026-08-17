@@ -90,6 +90,41 @@ function truncate(text, maxLength) {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
+function whatHappenedFor(item) {
+  const title = truncate(item.title, 140);
+  const description = truncate(item.description, 180);
+  if (description) {
+    return `According to the original publisher, ${title}. ${description}`;
+  }
+  return `According to the original publisher, ${title}.`;
+}
+
+function whyItMattersForBrief(item) {
+  return EXECUTIVE_WHY[item.category] || EXECUTIVE_WHY.Banking;
+}
+
+function audienceFor(item) {
+  const text = `${item.title || ""} ${item.description || ""}`.toLowerCase();
+
+  if (item.category === "Regulation") {
+    return /\b(risk|fraud|penalty|cyber|outage)\b/.test(text)
+      ? "Risk leaders"
+      : "Compliance leaders";
+  }
+
+  if (item.category === "Payments") return "Payments leaders";
+  if (item.category === "AI + Finance") return "CIO / CTO";
+  if (item.category === "Insurance") return "Insurance executives";
+
+  if (item.category === "Fintech") {
+    return /\b(funding|acquisition|merger|capital|invest)\b/.test(text)
+      ? "Financial-services investors"
+      : "Fintech founders";
+  }
+
+  return "Bank executives";
+}
+
 function indiaImpactFor(item) {
   if (item.region === "India") {
     return INDIA_IMPACT[item.category] || INDIA_IMPACT.Banking;
